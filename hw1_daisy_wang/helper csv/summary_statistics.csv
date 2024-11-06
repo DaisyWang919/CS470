@@ -1,0 +1,7 @@
+,Mean,Standard Deviation,Minimum,Q1,Median,Q3,Maximum
+age,54.84,9.248226693247577,35.0,47.0,57.0,61.0,76.0
+resting blood pressure,130.27,16.509473864200743,94.0,120.0,130.0,140.0,178.0
+serum cholesterol in mg/dl,247.01,58.99195202771649,126.0,209.0,234.5,270.75,564.0
+maximum heart rate achieved,147.57,22.87438468565821,96.0,129.75,149.5,165.75,186.0
+oldpeak = ST depression induced by exercise relative to rest,0.902,1.079279595120951,0.0,0.0,0.45,1.525,4.2
+number of major vessels (0-3) colored by flourosopy,0.63,0.8950481054731703,0.0,0.0,0.0,1.0,3.0
