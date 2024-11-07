@@ -1,17 +1,17 @@
 import random
 import numpy as np
 import pandas as pd
+import argparse
 
 class DecisionNode:
     def __init__(self, feature=None, threshold=None, left=None, right=None, value=None):
-        self.feature = feature          # Index of the feature used for splitting
-        self.threshold = threshold      # Threshold value for the split
-        self.left = left                # Left subtree (for values <= threshold)
-        self.right = right              # Right subtree (for values > threshold)
-        self.value = value              # Value if it's a leaf node (e.g., class label)
+        self.feature = feature
+        self.threshold = threshold
+        self.left = left
+        self.right = right
+        self.value = value
 
 def gini_index(groups, classes):
-    # Calculate Gini index for a split
     n_instances = float(sum([len(group) for group in groups]))
     gini = 0.0
     for group in groups:
@@ -51,7 +51,7 @@ def to_terminal(group):
 
 def split(node, max_depth, min_size, depth):
     left, right = node['groups']
-    del(node['groups'])
+    del node['groups']
     if not left or not right:
         node['left'] = node['right'] = to_terminal(left + right)
         return
@@ -62,12 +62,12 @@ def split(node, max_depth, min_size, depth):
         node['left'] = to_terminal(left)
     else:
         node['left'] = get_split(left)
-        split(node['left'], max_depth, min_size, depth+1)
+        split(node['left'], max_depth, min_size, depth + 1)
     if len(right) <= min_size:
         node['right'] = to_terminal(right)
     else:
         node['right'] = get_split(right)
-        split(node['right'], max_depth, min_size, depth+1)
+        split(node['right'], max_depth, min_size, depth + 1)
 
 def build_tree(train, max_depth, min_size):
     root = get_split(train)
@@ -86,29 +86,50 @@ def predict(node, row):
         else:
             return node['right']
 
-# Load the data and preprocess
-data = pd.read_csv('data.csv')
+def main(data_path, train_ids_path, test_ids_path, output_path):
+    # Load data
+    data = pd.read_csv(data_path)
 
-# Encode categorical variables using label encoding for simplicity
-for col in data.select_dtypes(include=['object']).columns:
-    data[col] = data[col].astype('category').cat.codes
+    # Encode categorical variables using label encoding
+    for col in data.select_dtypes(include=['object']).columns:
+        if col != 'Has heart disease? (Prediction Target)':
+            data[col] = data[col].astype('category').cat.codes
 
-# Drop any non-feature columns like 'person ID'
-data = data.drop(columns=['person ID'])
-dataset = data.values.tolist()
+    # Map the target variable
+    data['Has heart disease? (Prediction Target)'] = data['Has heart disease? (Prediction Target)'].map({'Yes': 1, 'No': 0})
 
-# Train-test split
-random.shuffle(dataset)
-train_size = int(0.7 * len(dataset))
-train_data = dataset[:train_size]
-test_data = dataset[train_size:]
+    # Load training and testing IDs
+    with open(train_ids_path, 'r') as file:
+        train_ids = set(file.read().splitlines())
+    with open(test_ids_path, 'r') as file:
+        test_ids = set(file.read().splitlines())
 
-# Build and evaluate the tree
-tree = build_tree(train_data, max_depth=5, min_size=10)
-predictions = [predict(tree, row) for row in test_data]
-actual = [row[-1] for row in test_data]
-print(predictions)
-print(actual)
-# Calculate accuracy
-accuracy = sum(1 for i in range(len(actual)) if actual[i] == predictions[i]) / len(actual)
-print(f"Accuracy: {accuracy:.2f}")
+    # Split data based on IDs
+    train_data = data[data['person ID'].astype(str).isin(train_ids)].drop(columns=['person ID']).values.tolist()
+    test_data = data[data['person ID'].astype(str).isin(test_ids)].drop(columns=['person ID']).values.tolist()
+
+    # Build and evaluate the tree
+    tree = build_tree(train_data, max_depth=20, min_size=1)
+    predictions = [predict(tree, row) for row in test_data]
+    actual = [row[-1] for row in test_data]
+
+    # Save predictions to output file
+    with open(output_path, 'w') as file:
+        for i, row in enumerate(test_data):
+            person_id = str(row[0])
+            prediction = 'yes' if predictions[i] == 1 else 'no'
+            file.write(f"{person_id} {prediction}\n")
+
+    # Print evaluation metrics
+    accuracy = sum(1 for i in range(len(actual)) if actual[i] == predictions[i]) / len(actual)
+    print(f"Accuracy: {accuracy:.2f}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Decision Tree Implementation")
+    parser.add_argument("data_path", help="Path to the input dataset file")
+    parser.add_argument("train_ids_path", help="Path to the training IDs file")
+    parser.add_argument("test_ids_path", help="Path to the testing IDs file")
+    parser.add_argument("output_path", help="Path to save the prediction output file")
+
+    args = parser.parse_args()
+    main(args.data_path, args.train_ids_path, args.test_ids_path, args.output_path)
