@@ -36,38 +36,41 @@ def test_split(feature_index, threshold, dataset):
 
 def get_split(dataset):
     class_values = list(set(row[-1] for row in dataset))
-    b_index, b_value, b_score, b_groups = 999, 999, 999, None
-    for index in range(len(dataset[0]) - 1):
+    best_feature, best_threshold, best_score, best_groups = None, None, float('inf'), None
+    
+    for feature_index in range(len(dataset[0]) - 1):
+        feature = set()
         for row in dataset:
-            groups = test_split(index, row[index], dataset)
+            if row[feature_index] in feature: continue
+            groups = test_split(feature_index, row[feature_index], dataset)
+            feature.add(row[feature_index])
             gini = gini_index(groups, class_values)
-            if gini < b_score:
-                b_index, b_value, b_score, b_groups = index, row[index], gini, groups
-    return {'index': b_index, 'value': b_value, 'groups': b_groups}
+            if gini < best_score:
+                best_feature, best_threshold, best_score, best_groups = feature_index, row[feature_index], gini, groups
+    return DecisionNode(feature=best_feature, threshold=best_threshold, left=best_groups[0], right=best_groups[1])
 
 def to_terminal(group):
     outcomes = [row[-1] for row in group]
     return max(set(outcomes), key=outcomes.count)
 
 def split(node, max_depth, min_size, depth):
-    left, right = node['groups']
-    del node['groups']
+    left, right = node.left, node.right
     if not left or not right:
-        node['left'] = node['right'] = to_terminal(left + right)
+        node.left = node.right = to_terminal(left + right)
         return
     if depth >= max_depth:
-        node['left'], node['right'] = to_terminal(left), to_terminal(right)
+        node.left, node.right = to_terminal(left), to_terminal(right)
         return
     if len(left) <= min_size:
-        node['left'] = to_terminal(left)
+        node.left = to_terminal(left)
     else:
-        node['left'] = get_split(left)
-        split(node['left'], max_depth, min_size, depth + 1)
+        node.left = get_split(left)
+        split(node.left, max_depth, min_size, depth + 1)
     if len(right) <= min_size:
-        node['right'] = to_terminal(right)
+        node.right = to_terminal(right)
     else:
-        node['right'] = get_split(right)
-        split(node['right'], max_depth, min_size, depth + 1)
+        node.right = get_split(right)
+        split(node.right, max_depth, min_size, depth + 1)
 
 def build_tree(train, max_depth, min_size):
     root = get_split(train)
@@ -75,16 +78,16 @@ def build_tree(train, max_depth, min_size):
     return root
 
 def predict(node, row):
-    if row[node['index']] <= node['value']:
-        if isinstance(node['left'], dict):
-            return predict(node['left'], row)
+    if row[node.feature] <= node.threshold:
+        if isinstance(node.left, DecisionNode):
+            return predict(node.left, row)
         else:
-            return node['left']
+            return node.left
     else:
-        if isinstance(node['right'], dict):
-            return predict(node['right'], row)
+        if isinstance(node.right, DecisionNode):
+            return predict(node.right, row)
         else:
-            return node['right']
+            return node.right
 
 def main(data_path, train_ids_path, test_ids_path, output_path):
     # Load data
